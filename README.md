@@ -69,3 +69,15 @@ npm run build
 backend/   FastAPI app, GraphQL schema, database models, and seed data
 frontend/  Angular app and Society Doom dashboard
 ```
+
+
+## Live demo
+
+- App: https://society-doom.vercel.app
+- API (GraphQL): https://society-doom-api.onrender.com/graphql
+- API health check: https://society-doom-api.onrender.com/health
+
+Admin login: `admin@doom.com` / `admin123`
+Resident login: `resident01@doom.com` / `resident123`
+
+The API runs on a free tier, so the first request may take about 50 seconds to wake up.
