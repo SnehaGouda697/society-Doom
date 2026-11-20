@@ -1,0 +1,39 @@
+:root {
+  color-scheme: dark;
+  --ink: #09111f;
+  --panel: #101d31;
+  --panel-raised: #14243c;
+  --sidebar: #123c91;
+  --sidebar-deep: #0c2d75;
+  --cyan: #08d9e8;
+  --safe: #10e88a;
+  --hazard: #f4c827;
+  --siren: #f34b64;
+  --muted: #9aabc3;
+  --line: #293b56;
+  --paper: #f5f7fb;
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--ink);
+  color: var(--paper);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+html, body { min-width: 320px; min-height: 100%; margin: 0; }
+body { min-height: 100vh; font-size: 16px; }
+button, input { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.display-font, h1, h2, h3 { font-family: 'Archivo', sans-serif; letter-spacing: -0.01em; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

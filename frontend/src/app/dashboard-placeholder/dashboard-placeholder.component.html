@@ -1,0 +1,278 @@
+<main class="dashboard-shell">
+  <header class="topbar">
+    <a class="brand-lockup" routerLink="/dashboard" aria-label="Society Doom dashboard">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span>Society <strong>Doom</strong></span>
+    </a>
+    <div class="topbar-right">
+      <span class="user-chip"><span class="avatar">{{ auth.currentUser?.name?.charAt(0) }}</span><span>{{ auth.currentUser?.name }}</span></span>
+      <button type="button" class="sign-out" (click)="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <div class="app-frame">
+    <aside class="sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <button type="button" class="nav-item" *ngFor="let item of navigation" [class.active]="activeSection === item.id" (click)="setSection(item.id)">
+          <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span><span>{{ item.label }}</span>
+        </button>
+      </nav>
+      <div class="sidebar-profile"><span class="avatar">{{ auth.currentUser?.name?.charAt(0) }}</span><span class="profile-copy"><strong>{{ auth.currentUser?.name }}</strong><small>{{ isAdmin ? 'Administrator' : 'Resident' }}</small></span><span class="profile-chevron">⌄</span></div>
+    </aside>
+
+  <div class="page-wrap">
+    <section class="page-heading" id="overview">
+      <div>
+        <p class="eyebrow">Society Doom · {{ isAdmin ? 'Admin workspace' : 'Resident workspace' }}</p>
+        <h1>{{ activeSection === 'dashboard' ? (isAdmin ? 'Your society, in view.' : 'Welcome home, ' + (auth.currentUser?.name || 'resident') + '.') : pageTitle }}</h1>
+        <p class="subtitle" *ngIf="activeSection === 'dashboard'">{{ isAdmin ? 'A clear picture of bills, resident scores, and community activity.' : 'Your monthly bills, society score, and utility use in one place.' }}</p>
+        <p class="subtitle" *ngIf="activeSection === 'properties'">Explore homes, occupancy, and community scores.</p>
+        <p class="subtitle" *ngIf="activeSection === 'finance'">Track billed, collected, and outstanding payments.</p>
+        <p class="subtitle" *ngIf="activeSection === 'tenants'">Resident directory and home assignments.</p>
+        <p class="subtitle" *ngIf="activeSection === 'maintenance'">Report repairs and follow their progress.</p>
+        <p class="subtitle" *ngIf="activeSection === 'settings'">Your account and application preferences.</p>
+      </div>
+      <label class="period-picker" *ngIf="activeSection !== 'settings' && activeSection !== 'tenants' && activeSection !== 'maintenance'">
+        <span>Reporting period</span>
+        <span class="period-controls">
+          <select aria-label="Month" [(ngModel)]="month" (ngModelChange)="onPeriodChange()">
+            <option *ngFor="let name of monthNames; let i = index" [ngValue]="i + 1">{{ name }}</option>
+          </select>
+          <select aria-label="Year" [(ngModel)]="year" (ngModelChange)="onPeriodChange()">
+            <option *ngFor="let option of years" [ngValue]="option">{{ option }}</option>
+          </select>
+        </span>
+      </label>
+    </section>
+
+    <div class="notice success" *ngIf="notice" role="status"><span class="notice-icon">✓</span>{{ notice }}</div>
+    <div class="notice error" *ngIf="errorMessage" role="alert"><span class="notice-icon">!</span>{{ errorMessage }}</div>
+
+    <section class="loading-state" *ngIf="activeSection === 'dashboard' && loading" aria-live="polite">
+      <span class="spinner"></span><span>Loading your society report…</span>
+    </section>
+
+    <ng-container *ngIf="activeSection === 'dashboard' && !loading">
+      <ng-container *ngIf="isAdmin; else residentDashboard">
+        <section class="reference-dashboard" *ngIf="report as society">
+          <article class="panel doom-meter-panel">
+            <div class="visual-panel-heading"><div><p class="eyebrow">Community health</p><h2>Doom meter</h2></div><span class="panel-count">{{ monthLabel(month, year) }}</span></div>
+            <div class="gauge-wrap">
+              <svg class="gauge-svg" viewBox="0 0 260 165" role="img" [attr.aria-label]="'Society score ' + (society.averageScore | number:'1.0-0') + ' out of 100'">
+                <path d="M 20 132 A 110 110 0 0 1 75 36" class="gauge-track gauge-green" />
+                <path d="M 75 36 A 110 110 0 0 1 185 36" class="gauge-track gauge-yellow" />
+                <path d="M 185 36 A 110 110 0 0 1 240 132" class="gauge-track gauge-red" />
+                <text x="13" y="143">0</text><text x="49" y="61">25</text><text x="123" y="19">50</text><text x="204" y="61">75</text><text x="236" y="143">100</text>
+                <line x1="130" y1="132" x2="130" y2="38" class="gauge-needle" [attr.transform]="'rotate(' + (society.averageScore * 1.8 - 90) + ' 130 132)'" />
+                <circle cx="130" cy="132" r="8" class="gauge-hub" />
+              </svg>
+              <div class="gauge-caption"><strong>{{ society.averageScore | number:'1.0-0' }}</strong><span>{{ society.averageScore >= 75 ? 'THRIVING' : society.averageScore >= 50 ? 'MODERATE' : 'NEEDS CARE' }}</span></div>
+            </div>
+            <div class="gauge-scale"><span>At risk</span><span>{{ society.flatCount }} homes</span><span>Thriving</span></div>
+          </article>
+
+          <article class="panel billing-overview-panel">
+            <div class="visual-panel-heading"><div><p class="eyebrow">This month</p><h2>Billing overview</h2></div><span class="panel-count">{{ monthLabel(month, year) }}</span></div>
+            <div class="billing-amounts">
+              <div class="billing-amount collected-amount"><strong>{{ currency(society.collected) }}</strong><span>Collected</span></div>
+              <div class="billing-amount pending-amount"><strong>{{ currency(society.pending) }}</strong><span>Pending</span></div>
+              <div class="billing-amount overdue-amount"><strong>{{ currency(overdueAmount) }}</strong><span>Overdue</span></div>
+            </div>
+            <div class="billing-total-line"><span>Collection progress</span><strong>{{ society.totalBilled ? (society.collected / society.totalBilled | percent:'1.0-0') : '0%' }}</strong></div>
+            <div class="billing-progress"><span [style.width.%]="society.totalBilled ? society.collected / society.totalBilled * 100 : 0"></span></div>
+            <div class="billing-total-line muted"><span>{{ currency(society.totalBilled) }} billed across {{ society.flatCount }} homes</span><span></span></div>
+          </article>
+
+          <article class="panel revenue-panel">
+            <div class="visual-panel-heading"><div><p class="eyebrow">Income mix</p><h2>Revenue breakdown</h2></div><span class="panel-count">{{ currency(society.totalBilled) }}</span></div>
+            <div class="revenue-content"><div class="donut-chart" [style.background]="revenueDonut"><div class="donut-center"><strong>{{ revenueGroups.length }}</strong><span>CHARGES</span></div></div>
+              <div class="revenue-legend"><div class="legend-row" *ngFor="let item of revenueGroups"><span class="legend-color" [style.background]="item.color"></span><span>{{ categoryLabel(item.category) }}</span><strong>{{ currency(item.amount) }}</strong></div><div class="empty-inline" *ngIf="!revenueGroups.length">No bills for this month.</div></div>
+            </div>
+          </article>
+
+          <article class="panel trend-panel">
+            <div class="visual-panel-heading"><div><p class="eyebrow">Last six months</p><h2>Society health trend</h2></div><span class="trend-key"><i></i>Score</span></div>
+            <div class="trend-chart"><div class="trend-y-labels"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div><svg viewBox="0 0 500 145" preserveAspectRatio="none" role="img" aria-label="Six month society score trend"><path class="trend-gridline" d="M 20 26 H 480 M 20 51 H 480 M 20 76 H 480 M 20 101 H 480 M 20 126 H 480"/><path class="trend-area" [attr.d]="trendArea"/><polyline class="trend-line" [attr.points]="trendPolyline" /></svg></div>
+            <div class="trend-months"><span *ngFor="let point of scoreTrend">{{ point.label }}</span></div>
+          </article>
+
+          <article class="panel top-revenue-panel">
+            <div class="visual-panel-heading"><div><p class="eyebrow">This month</p><h2>Top homes by revenue</h2></div><span class="panel-count">Top 5</span></div>
+            <div class="revenue-home-row" *ngFor="let home of topRevenueHomes"><span>{{ home.flatNo }}</span><span class="home-revenue-track"><i [style.width.%]="home.amount / maxHomeRevenue * 100"></i></span><strong>{{ currency(home.amount) }}</strong></div>
+            <div class="empty-inline" *ngIf="!topRevenueHomes.length">No bill data available for this month.</div>
+          </article>
+        </section>
+
+        <section class="metric-grid" *ngIf="report as society">
+          <article class="metric-card feature-card">
+            <div class="metric-top"><span class="metric-icon cyan-icon">⌂</span><span class="metric-caption">Society health</span><span class="trend-pill">{{ monthLabel(month, year) }}</span></div>
+            <div class="metric-value">{{ society.averageScore | number:'1.0-0' }}<span class="metric-suffix">/100</span></div>
+            <div class="metric-foot"><span class="health-track"><span [style.width.%]="society.averageScore"></span></span><span>{{ society.flatCount }} homes</span></div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-top"><span class="metric-icon blue-icon">₹</span><span class="metric-caption">Billed this month</span></div>
+            <div class="metric-value">{{ currency(society.totalBilled) }}</div>
+            <div class="metric-foot muted">Across {{ society.flatCount }} homes</div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-top"><span class="metric-icon green-icon">↗</span><span class="metric-caption">Collected</span></div>
+            <div class="metric-value">{{ currency(society.collected) }}</div>
+            <div class="metric-foot"><span class="text-green">{{ society.totalBilled ? (society.collected / society.totalBilled | percent:'1.0-0') : '0%' }}</span><span class="muted"> of billed amount</span></div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-top"><span class="metric-icon amber-icon">!</span><span class="metric-caption">Needs attention</span></div>
+            <div class="metric-value">{{ society.doomZoneCount }}<span class="metric-suffix"> homes</span></div>
+            <div class="metric-foot"><span class="text-amber">{{ currency(society.pending) }}</span><span class="muted"> pending dues</span></div>
+          </article>
+        </section>
+
+        <section class="content-grid admin-grid">
+          <article class="panel leaderboard-panel" id="leaderboard">
+            <div class="panel-heading"><div><p class="eyebrow">Community pulse</p><h2>Home leaderboard</h2></div><span class="panel-count">{{ leaderboard.length }} homes</span></div>
+            <div class="leaderboard-head"><span>Rank / home</span><span>Monthly score</span><span>Status</span></div>
+            <div class="leader-row" *ngFor="let flat of leaderboard; let i = index">
+              <span class="home-rank"><span class="rank-number" [class.medal]="i < 3">{{ i + 1 | number:'2.0-0' }}</span><span class="home-avatar">{{ flat.flatNo.charAt(0) }}</span><span class="home-name">Flat {{ flat.flatNo }}</span></span>
+              <span class="score-cell"><span class="score-track"><span [style.width.%]="flat.score"></span></span><strong>{{ flat.score }}</strong></span>
+              <span class="badge" [class.badge-green]="flat.score >= 75" [class.badge-amber]="flat.score >= 50 && flat.score < 75" [class.badge-red]="flat.score < 50">{{ flat.badge }}</span>
+            </div>
+            <div class="empty-state" *ngIf="!leaderboard.length">No homes found for this period.</div>
+          </article>
+
+          <aside class="panel actions-panel" id="admin-actions">
+            <div class="panel-heading"><div><p class="eyebrow">Management</p><h2>Society actions</h2></div><span class="admin-mark">⌘</span></div>
+            <div class="action-block">
+              <div class="action-copy"><span class="action-icon">₹</span><div><h3>Generate monthly bills</h3><p>Create bills using recorded meter readings and activity.</p></div></div>
+              <button type="button" class="primary-button full-button" (click)="generateBills()" [disabled]="actionBusy || !leaderboard.length">{{ actionBusy ? 'Working…' : 'Generate bills for ' + monthLabel(month, year) }} <span>→</span></button>
+            </div>
+            <div class="action-block">
+              <div class="action-copy"><span class="action-icon purple-icon">✦</span><div><h3>Award community points</h3><p>Record this month’s contribution for a home.</p></div></div>
+              <form class="action-form" (ngSubmit)="savePoints()">
+                <label>Home<select name="pointsFlatId" [(ngModel)]="pointsFlatId" required><option *ngFor="let flat of flats" [ngValue]="flat.flatId">{{ flat.flatNo }}</option></select></label>
+                <div class="form-row"><label>Category<select name="pointsCategory" [(ngModel)]="pointsCategory"><option value="cleanliness">Cleanliness</option><option value="discipline">Discipline</option><option value="events">Events</option></select></label><label>Points<input name="pointsValue" type="number" min="0" max="100" [(ngModel)]="pointsValue" required></label></div>
+                <label>Note <span class="optional">(optional)</span><input name="pointsNote" type="text" placeholder="e.g. Garden cleanup" [(ngModel)]="pointsNote"></label>
+                <button type="submit" class="secondary-button" [disabled]="actionBusy || !flats.length">Save points <span>→</span></button>
+              </form>
+            </div>
+            <div class="action-block">
+              <div class="action-copy"><span class="action-icon blue-icon">⌁</span><div><h3>Record meter reading</h3><p>Add or update electricity or water usage.</p></div></div>
+              <form class="action-form" (ngSubmit)="saveReading()">
+                <div class="form-row"><label>Home<select name="readingFlatId" [(ngModel)]="readingFlatId" required><option *ngFor="let flat of flats" [ngValue]="flat.flatId">{{ flat.flatNo }}</option></select></label><label>Utility<select name="readingCategory" [(ngModel)]="readingCategory"><option value="electricity">Electricity</option><option value="water">Water</option></select></label></div>
+                <label>Units<input name="readingUnits" type="number" min="0" step="0.1" [(ngModel)]="readingUnits" required></label>
+                <button type="submit" class="secondary-button" [disabled]="actionBusy || !flats.length">Save reading <span>→</span></button>
+              </form>
+            </div>
+            <div class="action-block last-action">
+              <div class="action-copy"><span class="action-icon green-icon">◷</span><div><h3>Log a gym visit</h3><p>Keep community activity up to date.</p></div></div>
+              <form class="action-form" (ngSubmit)="saveGymLog()">
+                <div class="form-row"><label>Home<select name="gymFlatId" [(ngModel)]="gymFlatId" required><option *ngFor="let flat of flats" [ngValue]="flat.flatId">{{ flat.flatNo }}</option></select></label><label>Minutes<input name="gymMinutes" type="number" min="1" [(ngModel)]="gymMinutes" required></label></div>
+                <label>Visit date<input name="gymDate" type="date" [(ngModel)]="gymDate" required></label>
+                <button type="submit" class="secondary-button" [disabled]="actionBusy || !flats.length">Save gym visit <span>→</span></button>
+              </form>
+            </div>
+          </aside>
+        </section>
+      </ng-container>
+
+      <ng-template #residentDashboard>
+        <ng-container *ngIf="flatReport as home; else noHomeReport">
+          <section class="resident-summary">
+            <div class="resident-score-card">
+              <div><p class="eyebrow">Your community score · {{ monthLabel(month, year) }}</p><h2>{{ home.score }}<span>/100</span></h2><p class="score-caption">{{ home.badge }} · Flat {{ home.flatNo }}</p></div>
+              <div class="score-orbit"><span>{{ home.score }}</span><small>POINTS</small></div>
+            </div>
+            <article class="metric-card resident-bill-metric"><div class="metric-top"><span class="metric-icon blue-icon">₹</span><span class="metric-caption">Total billed</span></div><div class="metric-value">{{ currency(home.totalBilled) }}</div><div class="metric-foot muted">{{ home.bills.length }} bill items this month</div></article>
+            <article class="metric-card resident-bill-metric"><div class="metric-top"><span class="metric-icon amber-icon">◷</span><span class="metric-caption">Awaiting payment</span></div><div class="metric-value">{{ pendingBills }}<span class="metric-suffix"> bills</span></div><div class="metric-foot"><span class="text-green">{{ paidBills }} paid</span><span class="muted"> this month</span></div></article>
+          </section>
+
+          <section class="resident-detail-grid">
+            <article class="panel points-panel">
+              <div class="panel-heading"><div><p class="eyebrow">Your contributions</p><h2>Score breakdown</h2></div><span class="panel-count">{{ home.points.total }} points</span></div>
+              <div class="point-line"><span class="point-symbol cyan-icon">✦</span><span class="point-name">Cleanliness</span><span class="point-track"><span [style.width.%]="home.points.cleanliness / 40 * 100"></span></span><strong>{{ home.points.cleanliness }}<small> / 40</small></strong></div>
+              <div class="point-line"><span class="point-symbol blue-icon">◆</span><span class="point-name">Discipline</span><span class="point-track"><span [style.width.%]="home.points.discipline / 30 * 100"></span></span><strong>{{ home.points.discipline }}<small> / 30</small></strong></div>
+              <div class="point-line"><span class="point-symbol purple-icon">✧</span><span class="point-name">Events</span><span class="point-track"><span [style.width.%]="home.points.events / 30 * 100"></span></span><strong>{{ home.points.events }}<small> / 30</small></strong></div>
+              <div class="personal-rank" *ngIf="leaderboard.length"><span>Your place this month</span><strong>#{{ residentRank + 1 }} <small>of {{ leaderboard.length }} homes</small></strong></div>
+            </article>
+
+            <article class="panel usage-panel">
+              <div class="panel-heading"><div><p class="eyebrow">Last six readings</p><h2>Utility usage</h2></div><span class="panel-count">Units</span></div>
+              <div class="usage-chart-group"><div class="usage-title"><span class="legend-dot electricity-dot"></span>Electricity <strong>{{ electricity[electricity.length - 1]?.units ?? 0 }} <small>units</small></strong></div><div class="bar-chart"><div class="bar-column" *ngFor="let point of electricity"><span class="bar-value">{{ point.units | number:'1.0-0' }}</span><span class="bar electricity-bar" [style.height.%]="usageHeight(electricity, electricity.indexOf(point))"></span><small>{{ monthNames[point.month - 1].slice(0, 3) }}</small></div><p class="empty-inline" *ngIf="!electricity.length">No electricity readings yet.</p></div></div>
+              <div class="usage-chart-group"><div class="usage-title"><span class="legend-dot water-dot"></span>Water <strong>{{ water[water.length - 1]?.units ?? 0 }} <small>units</small></strong></div><div class="bar-chart"><div class="bar-column" *ngFor="let point of water"><span class="bar-value">{{ point.units | number:'1.0-0' }}</span><span class="bar water-bar" [style.height.%]="usageHeight(water, water.indexOf(point))"></span><small>{{ monthNames[point.month - 1].slice(0, 3) }}</small></div><p class="empty-inline" *ngIf="!water.length">No water readings yet.</p></div></div>
+            </article>
+          </section>
+
+          <section class="resident-lower-grid">
+            <article class="panel bills-panel">
+              <div class="panel-heading"><div><p class="eyebrow">Your account</p><h2>Monthly bills</h2></div><span class="panel-count">{{ monthLabel(month, year) }}</span></div>
+              <div class="bill-row bill-header"><span>Bill item</span><span>Due date</span><span>Amount</span><span>Status</span><span></span></div>
+              <div class="bill-row" *ngFor="let bill of home.bills"><span class="bill-category"><span class="bill-icon">{{ bill.category === 'electricity' ? 'ϟ' : bill.category === 'water' ? '≋' : '₹' }}</span>{{ categoryLabel(bill.category) }}<small *ngIf="bill.units !== null">{{ bill.units }} units</small></span><span class="bill-date">{{ bill.dueDate | date:'dd MMM yyyy' }}</span><strong>{{ currency(bill.amount) }}</strong><span class="badge" [class.badge-green]="bill.status === 'paid'" [class.badge-amber]="bill.status !== 'paid'">{{ bill.status }}</span><button type="button" class="pay-button" *ngIf="bill.status !== 'paid'" [disabled]="actionBusy" (click)="markPaid(bill.id)">Mark paid</button><span *ngIf="bill.status === 'paid'"></span></div>
+              <div class="empty-state" *ngIf="!home.bills.length">There are no bills for this month.</div>
+            </article>
+            <article class="panel mini-leaderboard">
+              <div class="panel-heading"><div><p class="eyebrow">Community pulse</p><h2>Top homes</h2></div><span class="panel-count">{{ monthLabel(month, year) }}</span></div>
+              <div class="mini-rank-row" *ngFor="let flat of topFlats; let i = index"><span class="rank-number" [class.medal]="i < 3">{{ i + 1 | number:'2.0-0' }}</span><span class="home-avatar">{{ flat.flatNo.charAt(0) }}</span><span class="home-name">Flat {{ flat.flatNo }}</span><span class="mini-score">{{ flat.score }}<small> pts</small></span></div>
+            </article>
+          </section>
+        </ng-container>
+        <ng-template #noHomeReport><div class="panel empty-state large-empty">No report is available for this flat and month yet.</div></ng-template>
+      </ng-template>
+    </ng-container>
+
+    <section class="section-loading" *ngIf="activeSection !== 'dashboard' && sectionLoading" aria-live="polite"><span class="spinner"></span>Loading {{ pageTitle.toLowerCase() }}…</section>
+    <div class="notice error" *ngIf="sectionError" role="alert"><span class="notice-icon">!</span>{{ sectionError }}</div>
+
+    <ng-container [ngSwitch]="activeSection" *ngIf="!sectionLoading">
+      <section class="section-page" *ngSwitchCase="'properties'">
+        <div class="section-stats"><article class="metric-card"><span class="metric-caption">Homes in view</span><strong>{{ properties.length }}</strong></article><article class="metric-card"><span class="metric-caption">Occupied homes</span><strong>{{ occupiedPropertyCount }}</strong></article><article class="metric-card"><span class="metric-caption">Average community score</span><strong>{{ averagePropertyScore | number:'1.0-0' }}<small>/100</small></strong></article></div>
+        <article class="panel directory-panel"><div class="panel-heading"><div><p class="eyebrow">Property directory</p><h2>Homes &amp; occupancy</h2></div><span class="panel-count">{{ monthLabel(month, year) }}</span></div>
+          <div class="data-table properties-table"><div class="data-row data-head"><span>Home</span><span>Block</span><span>Type</span><span>Area</span><span>Residents</span><span>Score</span></div>
+            <div class="data-row" *ngFor="let property of properties"><strong>{{ property.flatNo }}</strong><span>{{ property.block }}</span><span>{{ property.type }}</span><span>{{ property.areaSqft | number }} sq ft</span><span>{{ property.residentCount || 'Vacant' }}</span><span class="score-pill">{{ property.score }} <small>· {{ property.badge }}</small></span></div>
+            <div class="empty-state" *ngIf="!properties.length">No properties are available.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="section-page" *ngSwitchCase="'finance'">
+        <div class="section-stats"><article class="metric-card"><span class="metric-caption">Total billed</span><strong>{{ currency(collectedAmount + pendingAmount) }}</strong></article><article class="metric-card"><span class="metric-caption">Collected</span><strong class="text-green">{{ currency(collectedAmount) }}</strong></article><article class="metric-card"><span class="metric-caption">Outstanding</span><strong class="text-amber">{{ currency(pendingAmount) }}</strong></article></div>
+        <article class="panel directory-panel"><div class="panel-heading"><div><p class="eyebrow">Accounts &amp; payments</p><h2>Finance ledger</h2></div><span class="panel-count">{{ financeBills.length }} bill items</span></div>
+          <div class="data-table finance-table"><div class="data-row data-head"><span>Home</span><span>Charge</span><span>Due date</span><span>Amount</span><span>Status</span><span></span></div>
+            <div class="data-row" *ngFor="let bill of financeBills"><strong>{{ bill.flatNo }}</strong><span>{{ categoryLabel(bill.category) }}</span><span>{{ bill.dueDate | date:'dd MMM yyyy' }}</span><strong>{{ currency(bill.amount) }}</strong><span class="badge" [class.badge-green]="bill.status === 'paid'" [class.badge-amber]="bill.status !== 'paid'">{{ bill.status }}</span><button *ngIf="!isAdmin && bill.status !== 'paid'" type="button" class="pay-button" [disabled]="actionBusy" (click)="markPaid(bill.id)">Mark paid</button></div>
+            <div class="empty-state" *ngIf="!financeBills.length">No bills were found for {{ monthLabel(month, year) }}.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="section-page" *ngSwitchCase="'tenants'">
+        <div class="section-stats"><article class="metric-card"><span class="metric-caption">{{ isAdmin ? 'Residents' : 'Your account' }}</span><strong>{{ tenants.length }}</strong></article><article class="metric-card"><span class="metric-caption">Homes assigned</span><strong>{{ assignedTenantCount }}</strong></article><article class="metric-card"><span class="metric-caption">Access</span><strong>{{ isAdmin ? 'Admin directory' : 'Resident view' }}</strong></article></div>
+        <article class="panel directory-panel"><div class="panel-heading"><div><p class="eyebrow">People &amp; homes</p><h2>{{ isAdmin ? 'Resident directory' : 'Resident profile' }}</h2></div><span class="panel-count">{{ tenants.length }} residents</span></div>
+          <div class="data-table tenants-table"><div class="data-row data-head"><span>Resident</span><span>Email</span><span>Home</span><span>Account</span></div>
+            <div class="data-row" *ngFor="let tenant of tenants"><span class="tenant-name"><span class="avatar">{{ tenant.name.charAt(0) }}</span><strong>{{ tenant.name }}</strong></span><span>{{ tenant.email }}</span><strong>{{ tenant.flatNo || 'Not assigned' }}</strong><span class="badge badge-green">Active</span></div>
+            <div class="empty-state" *ngIf="!tenants.length">No tenant accounts are available.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="section-page maintenance-layout" *ngSwitchCase="'maintenance'">
+        <article class="panel request-form-panel"><div class="panel-heading"><div><p class="eyebrow">Maintenance desk</p><h2>Report an issue</h2></div><span class="metric-icon amber-icon">⌁</span></div><p class="form-intro">Send a repair request to the society team and track its status here.</p>
+          <form class="action-form" (ngSubmit)="submitMaintenance()">
+            <label>Issue title<input name="maintenanceTitle" type="text" maxlength="120" placeholder="What needs attention?" [(ngModel)]="maintenanceTitle" required></label>
+            <div class="form-row"><label>Category<select name="maintenanceCategory" [(ngModel)]="maintenanceCategory"><option value="plumbing">Plumbing</option><option value="electrical">Electrical</option><option value="elevator">Elevator</option><option value="cleaning">Cleaning</option><option value="security">Security</option><option value="other">Other</option></select></label><label *ngIf="isAdmin">Home<select name="maintenanceFlatId" [(ngModel)]="maintenanceFlatId" required><option *ngFor="let home of maintenanceFlatOptions" [ngValue]="home.id">{{ home.flatNo }}</option></select></label></div>
+            <label>Description<textarea name="maintenanceDescription" rows="4" maxlength="1000" placeholder="Add details to help resolve the issue" [(ngModel)]="maintenanceDescription"></textarea></label>
+            <button type="submit" class="primary-button" [disabled]="actionBusy || !maintenanceTitle.trim()">{{ actionBusy ? 'Submitting…' : 'Submit request' }} <span>→</span></button>
+          </form>
+        </article>
+        <article class="panel requests-panel"><div class="panel-heading"><div><p class="eyebrow">{{ isAdmin ? 'All homes' : 'Your home' }}</p><h2>Maintenance requests</h2></div><span class="panel-count">{{ openMaintenanceCount }} open</span></div>
+          <div class="request-card" *ngFor="let request of maintenanceRequests"><div class="request-card-top"><span class="request-category">{{ categoryLabel(request.category) }} <span *ngIf="isAdmin">· Flat {{ request.flatNo }}</span></span><span class="badge" [class.badge-green]="request.status === 'resolved'" [class.badge-amber]="request.status !== 'resolved'">{{ categoryLabel(request.status) }}</span></div><h3>{{ request.title }}</h3><p>{{ request.description || 'No additional details.' }}</p><div class="request-card-bottom"><span>Reported {{ request.createdOn | date:'dd MMM yyyy' }}</span><label *ngIf="isAdmin" class="status-control">Update status<select [ngModel]="request.status" [name]="'status-' + request.id" (ngModelChange)="changeMaintenanceStatus(request.id, $event)"><option value="open">Open</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option></select></label></div></div>
+          <div class="empty-state" *ngIf="!maintenanceRequests.length">No maintenance requests yet.</div>
+        </article>
+      </section>
+
+      <section class="section-page settings-layout" *ngSwitchCase="'settings'">
+        <article class="panel settings-card"><div class="panel-heading"><div><p class="eyebrow">Your account</p><h2>Profile details</h2></div><span class="avatar settings-avatar">{{ auth.currentUser?.name?.charAt(0) }}</span></div><div class="settings-detail"><span>Full name</span><strong>{{ auth.currentUser?.name }}</strong></div><div class="settings-detail"><span>Email address</span><strong>{{ auth.currentUser?.email }}</strong></div><div class="settings-detail"><span>Account role</span><strong>{{ isAdmin ? 'Society administrator' : 'Resident' }}</strong></div><div class="settings-detail"><span>Home</span><strong>{{ isAdmin ? 'Society-wide access' : (properties[0]?.flatNo || 'Loading…') }}</strong></div></article>
+        <article class="panel settings-card"><div class="panel-heading"><div><p class="eyebrow">App preferences</p><h2>Workspace settings</h2></div><span class="metric-icon blue-icon">⚙</span></div><div class="settings-detail"><span>Default reporting period</span><strong>{{ monthLabel(month, year) }}</strong></div><p class="settings-note">Use the period selector on Dashboard, Properties, or Finance to change the reporting month. Your account is protected by authenticated access.</p><button type="button" class="secondary-button" (click)="signOut()">Sign out of Society Doom <span>→</span></button></article>
+      </section>
+    </ng-container>
+
+    <footer class="dashboard-footer"><span class="status-dot"></span> Society Doom <span>·</span> Community, clearly connected.</footer>
+  </div>
+  </div>
+</main>
